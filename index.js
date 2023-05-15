@@ -1,6 +1,7 @@
 const express = require('express')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const cors = require('cors')
+const jwt = require('jsonwebtoken')
 const app = express()
 require('dotenv').config()
 
@@ -18,6 +19,14 @@ const client = new MongoClient(uri, {
         deprecationErrors: true,
     }
 });
+const verifyjwt = (req,res,next) =>{
+    console.log('hiting verify jwt')
+    console.log(req.headers.authoriztion)
+    const authoriztion = req.headers.authoriztion
+    if(authoriztion){
+        return res.status(401).send({error:true,massage:unauthorizedperson})
+    }
+}
 
 async function run() {
     try {
@@ -26,6 +35,14 @@ async function run() {
         // Send a ping to confirm a successful connection
         const carDoctor = client.db('carDoctor').collection('carServises')
         const carDoctors = client.db('carDoctor').collection('bookings')
+
+        app.post('/jwt', (req, res) => {
+            const user = req.body
+            const token = jwt.sign(user, process.env.ACSSES_TOKEN, {
+                expiresIn: '1h'
+            })
+            res.send({ token })
+        })
 
         app.get('/servises', async (req, res) => {
             const cursor = carDoctor.find()
@@ -42,7 +59,8 @@ async function run() {
             const result = await carDoctor.findOne(query, options)
             res.send(result)
         })
-        app.get('/bookings', async (req, res) => {
+        app.get('/bookings', verifyjwt, async (req, res) => {
+            console.log(req.headers)
             let query = {};
             if (req.query?.email) {
                 query = { name: req.query.email }
@@ -62,13 +80,13 @@ async function run() {
             const updateBooking = req.body
             const updateDoc = {
                 $set: {
-                    status : updateBooking.status
+                    status: updateBooking.status
                 },
-                
+
             };
-            const result = await carDoctors.updateOne(query,updateDoc)
+            const result = await carDoctors.updateOne(query, updateDoc)
             res.send(result)
-            
+
         })
         app.delete('/bookings/:id', async (req, res) => {
             const id = req.params.id
